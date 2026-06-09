@@ -1,10 +1,12 @@
 import uuid
 from datetime import datetime
+from io import StringIO
+import csv
 
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.mock_data import get_mock_machines
+from backend.mock_data import get_mock_machines, set_mock_machines
 from backend.models import MachineData, ProductionIndicators, ProductionReport
 from backend.llm_service import generate_report_content
 
@@ -65,3 +67,13 @@ def generate_report():
         summary_text=llm_result["summary"],
         advices=llm_result["advices"],
     )
+
+@app.post("/import-csv", response_model=ProductionReport)
+async def upload_csv(file: UploadFile = File(...)):
+    content = await file.read()
+    reader = csv.DictReader(StringIO(content.decode("utf-8")))
+    machines = []
+    for i, row in enumerate(reader, start=1):
+        machines.append(MachineData.from_csv_row(row, str(i)))
+    set_mock_machines(machines)
+    return generate_report()

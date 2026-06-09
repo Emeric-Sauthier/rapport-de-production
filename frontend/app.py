@@ -48,33 +48,57 @@ def make_gauge(title: str, value: float) -> go.Figure:
     fig.update_layout(height=250, margin={"t": 40, "b": 0, "l": 20, "r": 20})
     return fig
 
+def load_machine_rows():
+    # --- Tableau des machines ---
+    machines = fetch_machines()
+    if machines is None:
+        st.error("Impossible de joindre le backend sur http://localhost:8000. Vérifiez qu'il est démarré.")
+        st.stop()
 
-# --- Tableau des machines ---
-machines = fetch_machines()
-if machines is None:
-    st.error("Impossible de joindre le backend sur http://localhost:8000. Vérifiez qu'il est démarré.")
-    st.stop()
+    st.session_state.rows = [
+        {
+            "Machine": m["machine_name"],
+            "Pièces produites": m["pieces_produced"],
+            "Pièces rejetées": m["pieces_rejected"],
+            "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
+            "Temps d'utilisation (min)": m["usage_time_min"],
+        }
+        for m in machines
+    ]
 
-rows = [
-    {
-        "Machine": m["machine_name"],
-        "Pièces produites": m["pieces_produced"],
-        "Pièces rejetées": m["pieces_rejected"],
-        "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
-        "Temps d'utilisation (min)": m["usage_time_min"],
-    }
-    for m in machines
-]
+load_machine_rows()
 st.subheader("Données machines")
-st.dataframe(rows, use_container_width=True)
+st.dataframe(st.session_state.rows, use_container_width=True)
+
+uploaded_file = st.file_uploader(
+    "Choisir un fichier CSV",
+    type=["csv"],
+    label_visibility="hidden"
+)
 
 # --- Bouton de génération ---
 if st.button("Générer le rapport", type="primary"):
     with st.spinner("Génération du rapport en cours..."):
         try:
-            resp = requests.post(f"{BACKEND_URL}/report/generate", timeout=60)
-            resp.raise_for_status()
-            st.session_state.report = resp.json()
+            if uploaded_file:
+                files = {
+                    "file": (
+                        uploaded_file.name,
+                        uploaded_file.getvalue(),
+                        "text/csv"
+                    )
+                }
+
+                response = requests.post(
+                    "http://localhost:8000/import-csv",
+                    files=files
+                )
+                load_machine_rows()
+                st.rerun()
+            else:
+                response = requests.post(f"{BACKEND_URL}/report/generate", timeout=60)
+            response.raise_for_status()
+            st.session_state.report = response.json()
         except requests.exceptions.ConnectionError:
             st.error("Impossible de joindre le backend. Vérifiez qu'il est démarré sur le port 8000.")
         except Exception as e:
