@@ -3,6 +3,15 @@ from datetime import datetime
 from io import StringIO
 import csv
 
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.mock_data import get_mock_machines
+from backend.models import (
+    MachineData, ProductionIndicators, ProductionReport,
+    ManufacturingOrder, ManufacturingOrderDto,
+    Downtime, DowntimeCreate,
+)
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -10,6 +19,9 @@ from backend.mock_data import get_mock_machines, set_mock_machines
 from backend.models import MachineData, ProductionIndicators, ProductionReport
 from backend.llm_service import generate_report_content
 from url import BACKEND_URL
+
+_manufacturing_orders: list[ManufacturingOrder] = []
+_downtimes: list[Downtime] = []
 
 app = FastAPI(title="Rapport de Production API")
 
@@ -68,6 +80,71 @@ def __generate_report():
         advices=llm_result["advices"],
     )
 
+
+# --- Manufacturing Orders ---
+
+@app.get("/manufacturing-orders", response_model=list[ManufacturingOrder])
+def list_manufacturing_orders():
+    return _manufacturing_orders
+
+
+@app.post("/manufacturing-orders", response_model=ManufacturingOrder, status_code=201)
+def create_manufacturing_order(body: ManufacturingOrderDto):
+    order = ManufacturingOrder(id=str(uuid.uuid4()), **body.model_dump())
+    _manufacturing_orders.append(order)
+    return order
+
+
+@app.put("/manufacturing-orders/{order_id}", response_model=ManufacturingOrder)
+def update_manufacturing_order(order_id: str, body: ManufacturingOrderDto):
+    for i, order in enumerate(_manufacturing_orders):
+        if order.id == order_id:
+            updated = ManufacturingOrder(id=order_id, **body.model_dump())
+            _manufacturing_orders[i] = updated
+            return updated
+    raise HTTPException(status_code=404, detail="Manufacturing order not found")
+
+
+@app.delete("/manufacturing-orders/{order_id}", status_code=204)
+def delete_manufacturing_order(order_id: str):
+    for i, order in enumerate(_manufacturing_orders):
+        if order.id == order_id:
+            _manufacturing_orders.pop(i)
+            return
+    raise HTTPException(status_code=404, detail="Manufacturing order not found")
+
+
+# --- Downtimes ---
+
+@app.get("/downtimes", response_model=list[Downtime])
+def list_downtimes():
+    return _downtimes
+
+
+@app.post("/downtimes", response_model=Downtime, status_code=201)
+def create_downtime(body: DowntimeCreate):
+    downtime = Downtime(id=str(uuid.uuid4()), **body.model_dump())
+    _downtimes.append(downtime)
+    return downtime
+
+
+@app.put("/downtimes/{downtime_id}", response_model=Downtime)
+def update_downtime(downtime_id: str, body: DowntimeCreate):
+    for i, dt in enumerate(_downtimes):
+        if dt.id == downtime_id:
+            updated = Downtime(id=downtime_id, **body.model_dump())
+            _downtimes[i] = updated
+            return updated
+    raise HTTPException(status_code=404, detail="Downtime not found")
+
+
+@app.delete("/downtimes/{downtime_id}", status_code=204)
+def delete_downtime(downtime_id: str):
+    for i, dt in enumerate(_downtimes):
+        if dt.id == downtime_id:
+            _downtimes.pop(i)
+            return
+    raise HTTPException(status_code=404, detail="Downtime not found")
 @app.post("/report/generate", response_model=ProductionReport)
 def generate_report():
     return __generate_report()
