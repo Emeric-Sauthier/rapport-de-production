@@ -26,3 +26,37 @@ class ProductionReport(BaseModel):
     global_indicators: ProductionIndicators
     summary_text: str
     advices: list[str]
+
+
+class ManufacturingOrder(BaseModel):
+    id: str
+    name: str
+    target_quantity: int
+    produced_quantity: int
+    start_time: datetime
+    end_time: datetime
+    machine: str
+
+
+class ManufacturingOrderDto(BaseModel):
+    name: str
+    target_quantity: int
+    produced_quantity: int
+    start_time: datetime
+    end_time: datetime
+    machine: str
+
+
+class Downtime(BaseModel):
+    id: str
+    cause: str
+    start_time: datetime
+    end_time: datetime
+    machine: str
+
+
+class DowntimeCreate(BaseModel):
+    cause: str
+    start_time: datetime
+    end_time: datetime
+    machine: str
