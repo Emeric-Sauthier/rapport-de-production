@@ -38,18 +38,9 @@ python -m scripts.check_llm
 ### Alternative — variable d'environnement (à refaire dans chaque terminal)
 
 ### Windows (PowerShell) — dans chaque terminal utilisé
-```powershell
-$env:GEMINI_API_KEY = "<votre_clé_api>"
+Créez un fichier `.env` à la racine et mettez-y votre clef API comme ci-dessous :  
 ```
-
-### Windows (CMD)
-```cmd
-set GEMINI_API_KEY=<votre_clé_api>
-```
-
-### Linux / macOS
-```bash
-export GEMINI_API_KEY=<votre_clé_api>
+GEMINI_API_KEY=<votre_clé_api>
 ```
 
 ## Étape 3 — Démarrer le backend (terminal 1)
