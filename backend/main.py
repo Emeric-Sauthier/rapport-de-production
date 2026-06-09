@@ -158,3 +158,41 @@ async def upload_csv(file: UploadFile = File(...)):
         machines.append(MachineData.from_csv_row(row, str(i)))
     set_mock_machines(machines)
     return __generate_report()
+
+
+@app.post("/import-csv/manufacturing-orders", response_model=list[ManufacturingOrder])
+async def import_orders_csv(file: UploadFile = File(...)):
+    global _manufacturing_orders
+    content = await file.read()
+    reader = csv.DictReader(StringIO(content.decode("utf-8-sig")))
+    orders = []
+    for row in reader:
+        orders.append(ManufacturingOrder(
+            id=str(uuid.uuid4()),
+            name=row["name"],
+            target_quantity=int(row["target_quantity"]),
+            produced_quantity=int(row["produced_quantity"]),
+            start_time=datetime.fromisoformat(row["start_time"]),
+            end_time=datetime.fromisoformat(row["end_time"]),
+            machine=row["machine"],
+        ))
+    _manufacturing_orders = orders
+    return _manufacturing_orders
+
+
+@app.post("/import-csv/downtimes", response_model=list[Downtime])
+async def import_downtimes_csv(file: UploadFile = File(...)):
+    global _downtimes
+    content = await file.read()
+    reader = csv.DictReader(StringIO(content.decode("utf-8-sig")))
+    downtimes = []
+    for row in reader:
+        downtimes.append(Downtime(
+            id=str(uuid.uuid4()),
+            cause=row["cause"],
+            start_time=datetime.fromisoformat(row["start_time"]),
+            end_time=datetime.fromisoformat(row["end_time"]),
+            machine=row["machine"],
+        ))
+    _downtimes = downtimes
+    return _downtimes

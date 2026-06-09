@@ -19,7 +19,6 @@ class MachineData(BaseModel):
         planned_time_min: float = 480.0,
         theoretical_rate_per_hour: float = 100.0,
     ) -> "MachineData":
-        print(row)
         return cls(
             machine_id=machine_id,
             machine_name=row["Machine"],
