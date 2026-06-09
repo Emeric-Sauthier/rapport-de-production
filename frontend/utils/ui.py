@@ -5,6 +5,7 @@ import streamlit as st
 from frontend.utils.api import (
     create_order, update_order, delete_order,
     create_downtime, update_downtime, delete_downtime,
+    fetch_machines_list,
 )
 
 
@@ -51,12 +52,11 @@ def order_form_dialog(order: dict | None = None, machine_preset: str | None = No
         value=order["name"] if editing else "",
         key="dlg_of_name",
     )
-    machine = st.text_input(
-        "Machine *",
-        value=order["machine"] if editing else (machine_preset or ""),
-        key="dlg_of_machine",
-    )
-    col1, col2 = st.columns(2)
+    machine_names = [m["name"] for m in fetch_machines_list()]
+    current_machine = order["machine"] if editing else (machine_preset or "")
+    default_idx = machine_names.index(current_machine) if current_machine in machine_names else 0
+    machine = st.selectbox("Machine *", options=machine_names, index=default_idx, key="dlg_of_machine")
+    col1, col2, col3 = st.columns(3)
     target_qty = col1.number_input(
         "Qté cible *",
         min_value=0,
@@ -68,6 +68,12 @@ def order_form_dialog(order: dict | None = None, machine_preset: str | None = No
         min_value=0,
         value=order["produced_quantity"] if editing else 0,
         key="dlg_of_produced",
+    )
+    rejects_qty = col3.number_input(
+        "Rejetées",
+        min_value=0,
+        value=order.get("rejects", 0) if editing else 0,
+        key="dlg_of_rejects",
     )
 
     st.markdown("**Début \\***")
@@ -107,8 +113,6 @@ def order_form_dialog(order: dict | None = None, machine_preset: str | None = No
         errors = []
         if not name.strip():
             errors.append("Le nom est obligatoire.")
-        if not machine.strip():
-            errors.append("La machine est obligatoire.")
         if end_combined <= start_combined:
             errors.append("La date de fin doit être postérieure à la date de début.")
 
@@ -121,6 +125,7 @@ def order_form_dialog(order: dict | None = None, machine_preset: str | None = No
                 "machine": machine.strip(),
                 "target_quantity": int(target_qty),
                 "produced_quantity": int(produced_qty),
+                "rejects": int(rejects_qty),
                 "start_time": start_combined.isoformat(),
                 "end_time": end_combined.isoformat(),
             }
@@ -147,11 +152,10 @@ def downtime_form_dialog(downtime: dict | None = None, machine_preset: str | Non
         value=downtime["cause"] if editing else "",
         key="dlg_dt_cause",
     )
-    machine = st.text_input(
-        "Machine *",
-        value=downtime["machine"] if editing else (machine_preset or ""),
-        key="dlg_dt_machine",
-    )
+    machine_names = [m["name"] for m in fetch_machines_list()]
+    current_machine = downtime["machine"] if editing else (machine_preset or "")
+    default_idx = machine_names.index(current_machine) if current_machine in machine_names else 0
+    machine = st.selectbox("Machine *", options=machine_names, index=default_idx, key="dlg_dt_machine")
 
     st.markdown("**Début \\***")
     col1, col2 = st.columns(2)
@@ -189,8 +193,6 @@ def downtime_form_dialog(downtime: dict | None = None, machine_preset: str | Non
         errors = []
         if not cause.strip():
             errors.append("La cause est obligatoire.")
-        if not machine.strip():
-            errors.append("La machine est obligatoire.")
         if end_combined <= start_combined:
             errors.append("La date de fin doit être postérieure à la date de début.")
 
@@ -249,22 +251,18 @@ def render_orders_table(orders: list[dict], machine_preset: str | None = None):
         st.info("Aucun ordre de fabrication.")
         return
 
-    h = st.columns([2, 2, 1, 1, 2.5, 2, 2, 0.6, 0.6])
-    for col, label in zip(h, ["Nom", "Machine", "Cible", "Produit", "Progression", "Début", "Fin", "", ""]):
+    h = st.columns([2, 2, 1, 1, 1, 2, 2, 0.6, 0.6])
+    for col, label in zip(h, ["Nom", "Machine", "Cible", "Produit", "Rejetées", "Début", "Fin", "", ""]):
         col.markdown(f"**{label}**")
     st.divider()
 
     for order in orders:
-        cols = st.columns([2, 2, 1, 1, 2.5, 2, 2, 0.6, 0.6])
+        cols = st.columns([2, 2, 1, 1, 1, 2, 2, 0.6, 0.6])
         cols[0].write(order["name"])
         cols[1].write(order["machine"])
         cols[2].write(str(order["target_quantity"]))
         cols[3].write(str(order["produced_quantity"]))
-
-        tgt = order["target_quantity"]
-        prog = min(order["produced_quantity"] / tgt, 1.0) if tgt > 0 else 0.0
-        cols[4].progress(prog, text=f"{int(prog * 100)}%")
-
+        cols[4].write(str(order.get("rejects", 0)))
         cols[5].write(_fmt_dt(_parse_dt(order.get("start_time"))))
         cols[6].write(_fmt_dt(_parse_dt(order.get("end_time"))))
 
@@ -305,43 +303,3 @@ def render_downtimes_table(downtimes: list[dict], machine_preset: str | None = N
             confirm_delete_downtime_dialog(downtime=dt)
 
 
-# ---------------------------------------------------------------------------
-# Cartes KPI machine
-# ---------------------------------------------------------------------------
-
-def render_kpi_cards(orders: list[dict], downtimes: list[dict], date_from: date, date_to: date):
-    dt_from = datetime.combine(date_from, datetime.min.time())
-    dt_to = datetime.combine(date_to, datetime.max.time())
-    total_secs = (dt_to - dt_from).total_seconds()
-    total_hours = total_secs / 3600
-
-    orders_p = [
-        o for o in orders
-        if (s := _parse_dt(o.get("start_time"))) and dt_from <= s <= dt_to
-    ]
-    downtimes_p = [
-        d for d in downtimes
-        if (s := _parse_dt(d.get("start_time"))) and dt_from <= s <= dt_to
-    ]
-
-    dt_total_secs = sum(
-        (end - start).total_seconds()
-        for d in downtimes_p
-        if (start := _parse_dt(d.get("start_time"))) and (end := _parse_dt(d.get("end_time")))
-    )
-    dt_total_hours = dt_total_secs / 3600
-
-    availability = (total_hours - dt_total_hours) / total_hours * 100 if total_hours > 0 else 0.0
-    produced = sum(o["produced_quantity"] for o in orders_p)
-    target = sum(o["target_quantity"] for o in orders_p)
-    performance = produced / target * 100 if target > 0 else 0.0
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Disponibilité", f"{availability:.1f}%")
-    col2.metric("Qté produite", f"{produced:,}")
-    col3.metric("Qté cible", f"{target:,}")
-
-    col4, col5, col6 = st.columns(3)
-    col4.metric("Performance", f"{performance:.1f}%")
-    col5.metric("Nb arrêts", str(len(downtimes_p)))
-    col6.metric("Durée arrêts", _fmt_duration(dt_total_secs))

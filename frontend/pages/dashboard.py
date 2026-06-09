@@ -54,10 +54,12 @@ with tabs[0]:
         rows = [
             {
                 "Machine": m["machine_name"],
+                "Cible": m["pieces_target"],
                 "Pièces produites": m["pieces_produced"],
                 "Pièces rejetées": m["pieces_rejected"],
-                "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
+                "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1) if m["pieces_produced"] > 0 else 0.0,
                 "Temps d'utilisation (min)": m["usage_time_min"],
+                "Temps planifié (min)": m["planned_time_min"],
             }
             for m in machines
         ]

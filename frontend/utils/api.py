@@ -73,6 +73,11 @@ def _delete(path: str) -> bool:
 def fetch_machines() -> list[dict]:
     return _get("/machines") or []
 
+
+def fetch_machines_list() -> list[dict]:
+    return _get("/machines-list") or []
+
+
 def fetch_orders() -> list[dict]:
     return _get("/manufacturing-orders") or []
 

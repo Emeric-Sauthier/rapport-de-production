@@ -3,25 +3,20 @@ from datetime import datetime
 from io import StringIO
 import csv
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.mock_data import get_mock_machines
 from backend.models import (
-    MachineData, ProductionIndicators, ProductionReport,
+    Machine, MachineData, ProductionIndicators, ProductionReport,
     ManufacturingOrder, ManufacturingOrderDto,
     Downtime, DowntimeCreate,
 )
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-
-from backend.mock_data import get_mock_machines, set_mock_machines
-from backend.models import MachineData, ProductionIndicators, ProductionReport
+from backend.machines_mock import get_machines_list
+from backend.mock_data import mock_orders, mock_downtimes
 from backend.llm_service import generate_report_content
-from url import BACKEND_URL
 
-_manufacturing_orders: list[ManufacturingOrder] = []
-_downtimes: list[Downtime] = []
+_manufacturing_orders: list[ManufacturingOrder] = list(mock_orders)
+_downtimes: list[Downtime] = list(mock_downtimes)
 
 app = FastAPI(title="Rapport de Production API")
 
@@ -33,16 +28,63 @@ app.add_middleware(
 )
 
 
+def compute_machines_from_orders_and_downtimes(
+    orders: list[ManufacturingOrder],
+    downtimes: list[Downtime],
+) -> list[MachineData]:
+    buckets: dict[str, dict] = {
+        m.name: {
+            "pieces_produced": 0,
+            "pieces_rejected": 0,
+            "pieces_target": 0,
+            "usage_time_min": 0.0,
+            "downtime_min": 0.0,
+        }
+        for m in get_machines_list()
+    }
+
+    for order in orders:
+        m = order.machine
+        if m not in buckets:
+            buckets[m] = {
+                "pieces_produced": 0,
+                "pieces_rejected": 0,
+                "pieces_target": 0,
+                "usage_time_min": 0.0,
+                "downtime_min": 0.0,
+            }
+        buckets[m]["pieces_produced"] += order.produced_quantity
+        buckets[m]["pieces_rejected"] += order.rejects
+        buckets[m]["pieces_target"] += order.target_quantity
+        buckets[m]["usage_time_min"] += (order.end_time - order.start_time).total_seconds() / 60
+
+    for dt in downtimes:
+        m = dt.machine
+        if m in buckets:
+            buckets[m]["downtime_min"] += (dt.end_time - dt.start_time).total_seconds() / 60
+
+    return [
+        MachineData(
+            machine_id=name.lower().replace(" ", "-"),
+            machine_name=name,
+            pieces_produced=b["pieces_produced"],
+            pieces_rejected=b["pieces_rejected"],
+            pieces_target=b["pieces_target"],
+            usage_time_min=round(b["usage_time_min"], 2),
+            planned_time_min=round(b["usage_time_min"] + b["downtime_min"], 2),
+        )
+        for name, b in buckets.items()
+    ]
+
+
 def compute_global_indicators(machines: list[MachineData]) -> ProductionIndicators:
     total_produced = sum(m.pieces_produced for m in machines)
     total_rejected = sum(m.pieces_rejected for m in machines)
+    total_target = sum(m.pieces_target for m in machines)
     total_usage = sum(m.usage_time_min for m in machines)
     total_planned = sum(m.planned_time_min for m in machines)
-    theoretical_output = sum(
-        (m.theoretical_rate_per_hour / 60) * m.usage_time_min for m in machines
-    )
 
-    performance = total_produced / theoretical_output if theoretical_output > 0 else 0.0
+    performance = total_produced / total_target if total_target > 0 else 0.0
     quality = (total_produced - total_rejected) / total_produced if total_produced > 0 else 0.0
     availability = total_usage / total_planned if total_planned > 0 else 0.0
     trs = performance * quality * availability
@@ -55,19 +97,24 @@ def compute_global_indicators(machines: list[MachineData]) -> ProductionIndicato
     )
 
 
+@app.get("/machines-list", response_model=list[Machine])
+def list_machines():
+    return get_machines_list()
+
+
 @app.get("/machines", response_model=list[MachineData])
 def get_machines():
-    return get_mock_machines()
+    return compute_machines_from_orders_and_downtimes(_manufacturing_orders, _downtimes)
 
 
 @app.get("/indicators/global", response_model=ProductionIndicators)
 def get_global_indicators():
-    machines = get_mock_machines()
+    machines = compute_machines_from_orders_and_downtimes(_manufacturing_orders, _downtimes)
     return compute_global_indicators(machines)
 
 
 def __generate_report():
-    machines = get_mock_machines()
+    machines = compute_machines_from_orders_and_downtimes(_manufacturing_orders, _downtimes)
     indicators = compute_global_indicators(machines)
     llm_result = generate_report_content(machines, indicators)
 
@@ -145,18 +192,10 @@ def delete_downtime(downtime_id: str):
             _downtimes.pop(i)
             return
     raise HTTPException(status_code=404, detail="Downtime not found")
+
+
 @app.post("/report/generate", response_model=ProductionReport)
 def generate_report():
-    return __generate_report()
-
-@app.post("/import-csv", response_model=ProductionReport)
-async def upload_csv(file: UploadFile = File(...)):
-    content = await file.read()
-    reader = csv.DictReader(StringIO(content.decode("utf-8-sig")))
-    machines = []
-    for i, row in enumerate(reader, start=1):
-        machines.append(MachineData.from_csv_row(row, str(i)))
-    set_mock_machines(machines)
     return __generate_report()
 
 
@@ -172,6 +211,7 @@ async def import_orders_csv(file: UploadFile = File(...)):
             name=row["name"],
             target_quantity=int(row["target_quantity"]),
             produced_quantity=int(row["produced_quantity"]),
+            rejects=int(row.get("rejects") or 0),
             start_time=datetime.fromisoformat(row["start_time"]),
             end_time=datetime.fromisoformat(row["end_time"]),
             machine=row["machine"],

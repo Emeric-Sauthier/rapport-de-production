@@ -9,7 +9,7 @@ if _project_root not in sys.path:
 
 import streamlit as st
 
-from frontend.utils.api import fetch_machines
+from frontend.utils.api import BACKEND_URL, fetch_machines, fetch_machines_list
 from frontend.pages.machine_detail import render_machine_detail
 
 st.set_page_config(
@@ -53,14 +53,14 @@ def load_machine_rows():
         for m in machines
     ]
 
-machines = fetch_machines()
+machines = fetch_machines_list()
 
 nav: dict[str, list] = {}
 nav[""] = [
     st.Page("pages/dashboard.py", title="Dashboard", icon="🏠", url_path="dashboard"),
 ]
 if machines:
-    nav["Machines"] = [_make_machine_page(m["machine_name"]) for m in machines]
+    nav["Machines"] = [_make_machine_page(m["name"]) for m in machines]
 nav["Gestion de production"] = [
     st.Page("pages/manufacturing_orders.py", title="Ordres de fabrication", icon="📋", url_path="manufacturing-orders"),
     st.Page("pages/downtimes.py", title="Arrêts", icon="⛔", url_path="downtimes"),
