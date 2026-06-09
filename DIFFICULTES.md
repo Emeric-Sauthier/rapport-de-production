@@ -32,13 +32,16 @@ free tier impose un rate limit par minute **et** un quota de **20 requêtes par
 jour** par modèle. Au-delà, Gemini renvoie `429 RESOURCE_EXHAUSTED` ; le backend
 l'avalait et affichait « Erreur ». Reproduit : 8 requêtes simultanées → 5 échecs.
 
-**Résolu (pics par minute)** : retry automatique avec backoff sur les 429
-(3 tentatives), et `thinking` désactivé (`thinking_budget=0`) pour accélérer et
-consommer moins de tokens.
+**Résolu** : les deux types de 429 sont distingués et traités différemment —
+- *rate limit par minute* (`PerMinute`) → retry avec backoff (3 tentatives) ;
+- *quota journalier épuisé* (`PerDay`) → bascule automatique sur le modèle de
+  repli suivant (`GEMINI_FALLBACK_MODELS`), sans retry inutile.
 
-**Limite restante** : le quota *journalier* ne se contourne pas par du code —
-soit basculer `GEMINI_MODEL` sur un modèle au quota séparé (ex.
-`gemini-2.5-flash-lite`), soit passer au tier payant.
+Plus `thinking` désactivé (`thinking_budget=0`) pour accélérer et consommer
+moins de tokens.
+
+**Limite restante** : si *tous* les modèles de repli ont leur quota journalier
+épuisé, seul le tier payant (ou attendre le reset du jour) débloque.
 
 ---
 
