@@ -71,7 +71,7 @@ def generate_report():
 @app.post("/import-csv", response_model=ProductionReport)
 async def upload_csv(file: UploadFile = File(...)):
     content = await file.read()
-    reader = csv.DictReader(StringIO(content.decode("utf-8")))
+    reader = csv.DictReader(StringIO(content.decode("utf-8-sig")))
     machines = []
     for i, row in enumerate(reader, start=1):
         machines.append(MachineData.from_csv_row(row, str(i)))
