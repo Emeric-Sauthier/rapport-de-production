@@ -19,6 +19,24 @@ pip install -r requirements.txt
 
 ## Étape 2 — Configuration de la clé API
 
+### Option recommandée — fichier `.env` (à faire une seule fois)
+
+Copiez `.env.example` en `.env` à la racine, puis renseignez votre clé :
+
+```powershell
+Copy-Item .env.example .env
+# puis éditez .env :  GEMINI_API_KEY=votre_clé
+```
+
+Le backend charge automatiquement ce fichier au démarrage. Le `.env` est ignoré
+par git : votre clé reste locale. Vérifiez la connexion avec :
+
+```powershell
+python -m scripts.check_llm
+```
+
+### Alternative — variable d'environnement (à refaire dans chaque terminal)
+
 ### Windows (PowerShell) — dans chaque terminal utilisé
 ```powershell
 $env:GEMINI_API_KEY = "<votre_clé_api>"
@@ -77,7 +95,7 @@ rapport-de-production/
 │   ├── main.py          # Application FastAPI
 │   ├── models.py        # Modèles Pydantic v2
 │   ├── mock_data.py     # Données simulées (2 machines)
-│   └── llm_service.py   # Intégration Gemini 2.0 Flash
+│   └── llm_service.py   # Intégration Gemini (gemini-2.5-flash, configurable)
 ├── frontend/
 │   └── app.py           # Interface Streamlit
 ├── requirements.txt

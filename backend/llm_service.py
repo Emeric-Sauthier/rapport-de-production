@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 from google import genai
@@ -6,14 +7,22 @@ from google.genai import types
 
 from backend.models import MachineData, ProductionIndicators
 
-MODEL = "gemini-2.0-flash"
+logger = logging.getLogger(__name__)
+
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 _client: genai.Client | None = None
 
 
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY absente : renseigne-la dans un fichier .env a la racine "
+                "du projet (copie .env.example en .env) puis relance le backend."
+            )
+        _client = genai.Client(api_key=api_key)
     return _client
 
 _RESPONSE_SCHEMA = {
@@ -70,7 +79,8 @@ Produis :
         )
         return json.loads(response.text)
     except Exception:
+        logger.exception("Echec de la generation du rapport via Gemini")
         return {
             "summary": "Erreur lors de la génération du rapport.",
-            "advices": ["Vérifier la clé API GEMINI_API_KEY."] * 5,
+            "advices": ["Vérifier la clé API GEMINI_API_KEY et la connexion réseau."] * 5,
         }
