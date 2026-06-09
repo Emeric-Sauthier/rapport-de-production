@@ -2,9 +2,20 @@ import requests
 import streamlit as st
 import plotly.graph_objects as go
 from url import BACKEND_URL
+from frontend.i18n import i18n
 
-st.set_page_config(page_title="Rapport de Production", layout="wide")
-st.title("Rapport de Production Industrielle")
+if "lang" not in st.session_state:
+    st.session_state.lang = "en"
+
+lang = st.selectbox(
+    i18n("language"),
+    options=["en", "fr"],
+    index=0 if st.session_state.lang == "en" else 1
+)
+st.session_state.lang = lang
+
+st.set_page_config(page_title=i18n("page_title"), layout="wide")
+st.title(i18n("page_title"))
 
 if "report" not in st.session_state:
     st.session_state.report = None
@@ -51,33 +62,33 @@ def load_machine_rows():
     # --- Tableau des machines ---
     machines = fetch_machines()
     if machines is None:
-        st.error(f"Impossible de joindre le backend sur {BACKEND_URL}. Vérifiez qu'il est démarré.")
+        st.error(i18n("backend_connection_error"))
         st.stop()
 
     st.session_state.rows = [
         {
-            "Machine": m["machine_name"],
-            "Pièces produites": m["pieces_produced"],
-            "Pièces rejetées": m["pieces_rejected"],
-            "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
-            "Temps d'utilisation (min)": m["usage_time_min"],
+            i18n("machine"): m["machine_name"],
+            i18n("produced_pieces"): m["pieces_produced"],
+            i18n("rejected_pieces"): m["pieces_rejected"],
+            i18n("rejection_rate"): round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
+            i18n("use_time"): m["usage_time_min"]
         }
         for m in machines
     ]
 
 load_machine_rows()
-st.subheader("Données machines")
+st.subheader(i18n("machines_data"))
 st.dataframe(st.session_state.rows, use_container_width=True)
 
 uploaded_file = st.file_uploader(
-    "Choisir un fichier CSV",
+    i18n("csv_upload"),
     type=["csv"],
     label_visibility="hidden"
 )
 
 # --- Bouton de génération ---
-if st.button("Générer le rapport", type="primary"):
-    with st.spinner("Génération du rapport en cours..."):
+if st.button(i18n("generate_report"), type="primary"):
+    with st.spinner("ongoing_report_generation"):
         try:
             if uploaded_file:
                 files = {
@@ -101,25 +112,25 @@ if st.button("Générer le rapport", type="primary"):
             if uploaded_file:
                 st.rerun()
         except requests.exceptions.ConnectionError:
-            st.error("Impossible de joindre le backend. Vérifiez qu'il est démarré sur le port 8000.")
+            st.error(i18n("backend_connection_error"))
         except Exception as e:
-            st.error(f"Erreur lors de la génération du rapport : {e}")
+            st.error(f"{i18n('report_generation_error')} : {e}")
 
 # --- Affichage du rapport ---
 if st.session_state.report:
     report = st.session_state.report
     ind = report["global_indicators"]
 
-    st.subheader("Indicateurs globaux")
+    st.subheader(i18n("global_indicators"))
     c1, c2, c3, c4 = st.columns(4)
-    c1.plotly_chart(make_gauge("Disponibilité", ind["availability"]), use_container_width=True)
-    c2.plotly_chart(make_gauge("Performance", ind["performance"]), use_container_width=True)
-    c3.plotly_chart(make_gauge("Qualité", ind["quality"]), use_container_width=True)
-    c4.plotly_chart(make_gauge("TRS (OEE)", ind["trs"]), use_container_width=True)
+    c1.plotly_chart(make_gauge(i18n("gauge_availability"), ind["availability"]), use_container_width=True)
+    c2.plotly_chart(make_gauge(i18n("gauge_performance"), ind["performance"]), use_container_width=True)
+    c3.plotly_chart(make_gauge(i18n("gauge_quality"), ind["quality"]), use_container_width=True)
+    c4.plotly_chart(make_gauge(i18n("gauge_trs"), ind["trs"]), use_container_width=True)
 
-    st.subheader("Synthèse")
+    st.subheader(i18n("synthesis"))
     st.info(report["summary_text"])
 
-    st.subheader("Recommandations")
+    st.subheader(i18n("recommendations"))
     for i, advice in enumerate(report["advices"], 1):
         st.markdown(f"**{i}.** {advice}")
