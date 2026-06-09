@@ -1,15 +1,19 @@
 import json
 import logging
 import os
+import time
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 from backend.models import MachineData, ProductionIndicators
 
 logger = logging.getLogger(__name__)
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# Tentatives et delai de base (s) en cas de rate limit (HTTP 429).
+_MAX_ATTEMPTS = 3
+_RETRY_BASE_DELAY_S = 4
 _client: genai.Client | None = None
 
 
@@ -68,19 +72,40 @@ Produis :
 2. Exactement 5 conseils concrets et actionnables d'amélioration ou de maintenance pour optimiser la production.
 """
 
-    try:
-        response = _get_client().models.generate_content(
-            model=MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=_RESPONSE_SCHEMA,
-            ),
-        )
-        return json.loads(response.text)
-    except Exception:
-        logger.exception("Echec de la generation du rapport via Gemini")
-        return {
-            "summary": "Erreur lors de la génération du rapport.",
-            "advices": ["Vérifier la clé API GEMINI_API_KEY et la connexion réseau."] * 5,
-        }
+    config = types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=_RESPONSE_SCHEMA,
+        # Thinking inutile pour un rapport de formatage : on le coupe pour
+        # accelerer la reponse (~3x) et reduire la consommation de tokens.
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
+    )
+
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            response = _get_client().models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=config,
+            )
+            return json.loads(response.text)
+        except errors.ClientError as e:
+            # 429 = rate limit du free tier : on patiente puis on reessaie.
+            is_rate_limit = getattr(e, "code", None) == 429 or "RESOURCE_EXHAUSTED" in str(e)
+            if is_rate_limit and attempt < _MAX_ATTEMPTS - 1:
+                delay = _RETRY_BASE_DELAY_S * (attempt + 1)
+                logger.warning(
+                    "Rate limit Gemini (429), nouvel essai dans %ss (%s/%s)",
+                    delay, attempt + 1, _MAX_ATTEMPTS,
+                )
+                time.sleep(delay)
+                continue
+            logger.exception("Echec Gemini (ClientError)")
+            break
+        except Exception:
+            logger.exception("Echec de la generation du rapport via Gemini")
+            break
+
+    return {
+        "summary": "Erreur lors de la génération du rapport.",
+        "advices": ["Vérifier la clé API GEMINI_API_KEY et la connexion réseau."] * 5,
+    }
