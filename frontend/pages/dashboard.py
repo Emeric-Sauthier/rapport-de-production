@@ -58,8 +58,6 @@ machines = fetch_machines()
 machine_names = [m["machine_name"] for m in machines]
 
 load_machine_rows()
-st.subheader(i18n("machines_data"))
-st.dataframe(st.session_state.rows, use_container_width=True)
 
 tab_labels = ["Global"] + machine_names
 tabs = st.tabs(tab_labels)
@@ -69,6 +67,10 @@ with tabs[0]:
     if not machines:
         st.error("Impossible de joindre le backend sur http://localhost:8000. Vérifiez qu'il est démarré.")
     else:
+        # --- Informations machines ---
+        st.subheader(i18n("machines_data"))
+        st.dataframe(st.session_state.rows, use_container_width=True)
+        
         # --- Bouton de génération ---
         if st.button(i18n("generate_report"), type="primary"):
             with st.spinner(i18n("ongoing_report_generation")):
