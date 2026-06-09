@@ -13,7 +13,8 @@ _client: genai.Client | None = None
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        dotenv = dict(list(map(lambda line: line.split('='), open(".env", "r").readlines())))
+        _client = genai.Client(api_key=dotenv["GEMINI_API_KEY"])
     return _client
 
 _RESPONSE_SCHEMA = {

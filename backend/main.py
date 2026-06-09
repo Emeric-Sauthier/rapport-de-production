@@ -1,5 +1,7 @@
 import uuid
 from datetime import datetime
+from io import StringIO
+import csv
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +12,13 @@ from backend.models import (
     ManufacturingOrder, ManufacturingOrderDto,
     Downtime, DowntimeCreate,
 )
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+
+from backend.mock_data import get_mock_machines, set_mock_machines
+from backend.models import MachineData, ProductionIndicators, ProductionReport
 from backend.llm_service import generate_report_content
+from url import BACKEND_URL
 
 _manufacturing_orders: list[ManufacturingOrder] = []
 _downtimes: list[Downtime] = []
@@ -58,8 +66,7 @@ def get_global_indicators():
     return compute_global_indicators(machines)
 
 
-@app.post("/report/generate", response_model=ProductionReport)
-def generate_report():
+def __generate_report():
     machines = get_mock_machines()
     indicators = compute_global_indicators(machines)
     llm_result = generate_report_content(machines, indicators)
@@ -138,3 +145,16 @@ def delete_downtime(downtime_id: str):
             _downtimes.pop(i)
             return
     raise HTTPException(status_code=404, detail="Downtime not found")
+@app.post("/report/generate", response_model=ProductionReport)
+def generate_report():
+    return __generate_report()
+
+@app.post("/import-csv", response_model=ProductionReport)
+async def upload_csv(file: UploadFile = File(...)):
+    content = await file.read()
+    reader = csv.DictReader(StringIO(content.decode("utf-8-sig")))
+    machines = []
+    for i, row in enumerate(reader, start=1):
+        machines.append(MachineData.from_csv_row(row, str(i)))
+    set_mock_machines(machines)
+    return __generate_report()
