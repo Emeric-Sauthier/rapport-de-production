@@ -1,0 +1,9 @@
+cause,start_time,end_time,machine
+Panne mécanique,2025-06-01T10:00:00,2025-06-01T11:30:00,Machine A
+Changement d'outil,2025-06-01T18:00:00,2025-06-01T18:45:00,Machine B
+Maintenance préventive,2025-06-02T12:00:00,2025-06-02T14:00:00,Machine A
+Défaut matière première,2025-06-02T16:30:00,2025-06-02T17:00:00,Machine B
+Panne électrique,2025-06-03T07:00:00,2025-06-03T08:30:00,Machine A
+Réglage machine,2025-06-03T15:00:00,2025-06-03T15:30:00,Machine B
+Nettoyage,2025-06-04T06:00:00,2025-06-04T06:30:00,Machine A
+Arrêt qualité,2025-06-04T19:00:00,2025-06-04T20:00:00,Machine B
