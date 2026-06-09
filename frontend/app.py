@@ -11,6 +11,7 @@ import streamlit as st
 
 from frontend.utils.api import BACKEND_URL, fetch_machines, fetch_machines_list
 from frontend.pages.machine_detail import render_machine_detail
+from frontend.utils.ui import init_lang, load_machine_rows
 
 st.set_page_config(
     page_title="Production",
@@ -34,24 +35,6 @@ def _make_machine_page(machine_name: str):
         url_path=f"machine-{_slugify(machine_name)}",
         icon="⚙️",
     )
-
-def load_machine_rows():
-    # --- Tableau des machines ---
-    machines = fetch_machines()
-    if machines is None:
-        st.error(f"Impossible de joindre le backend sur {BACKEND_URL}. Vérifiez qu'il est démarré.")
-        st.stop()
-
-    st.session_state.rows = [
-        {
-            "Machine": m["machine_name"],
-            "Pièces produites": m["pieces_produced"],
-            "Pièces rejetées": m["pieces_rejected"],
-            "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
-            "Temps d'utilisation (min)": m["usage_time_min"],
-        }
-        for m in machines
-    ]
 
 machines = fetch_machines_list()
 

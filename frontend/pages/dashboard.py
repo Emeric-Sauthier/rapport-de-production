@@ -6,6 +6,21 @@ import streamlit as st
 from frontend.utils.api import fetch_machines
 from frontend.pages.machine_detail import render_machine_detail
 
+from url import BACKEND_URL
+from frontend.i18n import i18n
+from frontend.utils.ui import init_lang, load_machine_rows
+
+init_lang()
+
+st.set_page_config(page_title=i18n("page_title"), layout="wide")
+st.title(i18n("page_title"))
+
+st.set_page_config(
+    page_title="Production",
+    page_icon="🏭",
+    layout="wide",
+)
+
 BACKEND_URL = "http://localhost:8000"
 
 
@@ -37,11 +52,14 @@ def _make_gauge(title: str, value: float) -> go.Figure:
     fig.update_layout(height=250, margin={"t": 40, "b": 0, "l": 20, "r": 20})
     return fig
 
-
-st.title("Dashboard")
+st.title(i18n("dashboard"))
 
 machines = fetch_machines()
 machine_names = [m["machine_name"] for m in machines]
+
+load_machine_rows()
+st.subheader(i18n("machines_data"))
+st.dataframe(st.session_state.rows, use_container_width=True)
 
 tab_labels = ["Global"] + machine_names
 tabs = st.tabs(tab_labels)
@@ -51,47 +69,34 @@ with tabs[0]:
     if not machines:
         st.error("Impossible de joindre le backend sur http://localhost:8000. Vérifiez qu'il est démarré.")
     else:
-        rows = [
-            {
-                "Machine": m["machine_name"],
-                "Cible": m["pieces_target"],
-                "Pièces produites": m["pieces_produced"],
-                "Pièces rejetées": m["pieces_rejected"],
-                "Taux de rejet (%)": round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1) if m["pieces_produced"] > 0 else 0.0,
-                "Temps d'utilisation (min)": m["usage_time_min"],
-                "Temps planifié (min)": m["planned_time_min"],
-            }
-            for m in machines
-        ]
-        st.subheader("Données machines")
-        st.dataframe(rows, use_container_width=True)
-
-        if st.button("Générer le rapport", type="primary"):
-            with st.spinner("Génération du rapport en cours..."):
+        # --- Bouton de génération ---
+        if st.button(i18n("generate_report"), type="primary"):
+            with st.spinner(i18n("ongoing_report_generation")):
                 try:
-                    resp = requests.post(f"{BACKEND_URL}/report/generate", timeout=60)
-                    resp.raise_for_status()
-                    st.session_state.report = resp.json()
+                    response = requests.post(f"{BACKEND_URL}/report/generate", timeout=60)
+                    response.raise_for_status()
+                    st.session_state.report = response.json()
                 except requests.exceptions.ConnectionError:
-                    st.error("Impossible de joindre le backend. Vérifiez qu'il est démarré sur le port 8000.")
+                    st.error(i18n("backend_connection_error"))
                 except Exception as e:
-                    st.error(f"Erreur lors de la génération du rapport : {e}")
+                    st.error(f"{i18n('report_generation_error')} : {e}")
 
+        # --- Affichage du rapport ---
         if st.session_state.get("report"):
             report = st.session_state.report
             ind = report["global_indicators"]
 
-            st.subheader("Indicateurs globaux")
+            st.subheader(i18n("global_indicators"))
             c1, c2, c3, c4 = st.columns(4)
-            c1.plotly_chart(_make_gauge("Disponibilité", ind["availability"]), use_container_width=True)
-            c2.plotly_chart(_make_gauge("Performance", ind["performance"]), use_container_width=True)
-            c3.plotly_chart(_make_gauge("Qualité", ind["quality"]), use_container_width=True)
-            c4.plotly_chart(_make_gauge("TRS (OEE)", ind["trs"]), use_container_width=True)
+            c1.plotly_chart(_make_gauge(i18n("gauge_availability"), ind["availability"]), use_container_width=True)
+            c2.plotly_chart(_make_gauge(i18n("gauge_performance"), ind["performance"]), use_container_width=True)
+            c3.plotly_chart(_make_gauge(i18n("gauge_quality"), ind["quality"]), use_container_width=True)
+            c4.plotly_chart(_make_gauge(i18n("gauge_trs"), ind["trs"]), use_container_width=True)
 
-            st.subheader("Synthèse")
+            st.subheader(i18n("synthesis"))
             st.info(report["summary_text"])
 
-            st.subheader("Recommandations")
+            st.subheader(i18n("recommendations"))
             for i, advice in enumerate(report["advices"], 1):
                 st.markdown(f"**{i}.** {advice}")
 
