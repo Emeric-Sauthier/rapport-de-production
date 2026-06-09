@@ -23,7 +23,13 @@ TRANSLATIONS = {
         "gauge_quality": "Quality",
         "gauge_trs": "TRS (OEE)",
         "synthesis": "Synthesis",
-        "recommendations": "Recommendations"
+        "recommendations": "Recommendations",
+        "downtime": "Downtime",
+        "new_downtime": "New Downtime",
+        "imported_downtime": "imported downtime",
+        "crafting_orders": "Crafting orders",
+        "new_crafting_order": "New crafting order",
+        "imported_orders": "imported orders"
     },
     "fr": {
         "language": "Langue",
@@ -46,7 +52,13 @@ TRANSLATIONS = {
         "gauge_quality": "Qualité",
         "gauge_trs": "TRS (OEE)",
         "synthesis": "Synthèse",
-        "recommendations": "Recommandations"
+        "recommendations": "Recommandations",
+        "downtime": "Arrêt",
+        "new_downtime": "Nouvel arrêt",
+        "imported_downtime": "arrêts importés",
+        "crafting_orders": "Ordres de fabrication",
+        "new_crafting_order": "Nouvel OF",
+        "imported_orders": "ordres importés"
     }
 }
 
