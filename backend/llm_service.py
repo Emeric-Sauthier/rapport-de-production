@@ -39,7 +39,7 @@ def generate_report_content(
     machines_detail = "\n".join(
         f"- {m.machine_name} : {m.pieces_produced} pièces produites, "
         f"{m.pieces_rejected} rejetées "
-        f"(taux de rejet : {m.pieces_rejected / m.pieces_produced * 100:.1f}%), "
+        f"(taux de rejet : {0 if m.pieces_produced == 0 else m.pieces_rejected / m.pieces_produced * 100:.1f}%), "
         f"temps d'utilisation : {m.usage_time_min} min"
         for m in machines
     )

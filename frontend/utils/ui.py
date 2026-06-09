@@ -5,8 +5,9 @@ import streamlit as st
 from frontend.utils.api import (
     create_order, update_order, delete_order,
     create_downtime, update_downtime, delete_downtime,
-    fetch_machines_list,
+    fetch_machines_list, fetch_machines
 )
+from frontend.i18n import i18n
 
 
 # ---------------------------------------------------------------------------
@@ -303,3 +304,31 @@ def render_downtimes_table(downtimes: list[dict], machine_preset: str | None = N
             confirm_delete_downtime_dialog(downtime=dt)
 
 
+def init_lang():
+    if "lang" not in st.session_state:
+        st.session_state.lang = "en"
+
+    lang = st.selectbox(
+        i18n("language"),
+        options=["en", "fr"],
+        index=0 if st.session_state.lang == "en" else 1
+    )
+    st.session_state.lang = lang
+
+def load_machine_rows():
+    # --- Tableau des machines ---
+    machines = fetch_machines()
+    if machines is None:
+        st.error(i18n("backend_connection_error"))
+        st.stop()
+
+    st.session_state.rows = [
+        {
+            i18n("machine"): m["machine_name"],
+            i18n("produced_pieces"): m["pieces_produced"],
+            i18n("rejected_pieces"): m["pieces_rejected"],
+            i18n("rejection_rate"): 0 if m["pieces_produced"] == 0 else round(m["pieces_rejected"] / m["pieces_produced"] * 100, 1),
+            i18n("use_time"): m["usage_time_min"]
+        }
+        for m in machines
+    ]
