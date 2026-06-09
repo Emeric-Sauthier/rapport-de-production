@@ -1,8 +1,7 @@
 import requests
 import streamlit as st
 import plotly.graph_objects as go
-
-BACKEND_URL = "http://localhost:8000"
+from url import BACKEND_URL
 
 st.set_page_config(page_title="Rapport de Production", layout="wide")
 st.title("Rapport de Production Industrielle")
@@ -52,7 +51,7 @@ def load_machine_rows():
     # --- Tableau des machines ---
     machines = fetch_machines()
     if machines is None:
-        st.error("Impossible de joindre le backend sur http://localhost:8000. Vérifiez qu'il est démarré.")
+        st.error(f"Impossible de joindre le backend sur {BACKEND_URL}. Vérifiez qu'il est démarré.")
         st.stop()
 
     st.session_state.rows = [
@@ -90,15 +89,17 @@ if st.button("Générer le rapport", type="primary"):
                 }
 
                 response = requests.post(
-                    "http://localhost:8000/import-csv",
-                    files=files
+                    BACKEND_URL + "/import-csv",
+                    files=files,
+                    timeout=60
                 )
                 load_machine_rows()
-                st.rerun()
             else:
                 response = requests.post(f"{BACKEND_URL}/report/generate", timeout=60)
             response.raise_for_status()
             st.session_state.report = response.json()
+            if uploaded_file:
+                st.rerun()
         except requests.exceptions.ConnectionError:
             st.error("Impossible de joindre le backend. Vérifiez qu'il est démarré sur le port 8000.")
         except Exception as e:
