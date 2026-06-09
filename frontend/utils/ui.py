@@ -103,6 +103,7 @@ def order_form_dialog(order: dict | None = None, machine_preset: str | None = No
     if st.button("Enregistrer", type="primary", key="dlg_of_submit"):
         start_combined = datetime.combine(start_date, start_time_val)
         end_combined = datetime.combine(end_date, end_time_val)
+        
         errors = []
         if not name.strip():
             errors.append("Le nom est obligatoire.")
